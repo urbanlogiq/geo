@@ -1,24 +1,25 @@
 use num_traits::{Float, FromPrimitive};
 use types::{Point, Line, Polygon, LineString, MultiPoint, MultiPolygon, MultiLineString};
 use algorithm::centroid::Centroid;
-use algorithm::map_coords::MapCoords;
+use algorithm::coords_iter::CoordsIter;
 
 // rotate a slice of points "angle" degrees about an origin
 // origin can be an arbitrary point, pass &Point::new(0., 0.)
 // for the actual origin
-fn rotation_matrix<T>(angle: T, origin: &Point<T>, points: &mut [Point<T>])
+fn rotation_matrix<'a, 'b, T, I>(angle: T, origin: &'a Point<T>, points: &mut I)
 where
     T: Float,
+    I: CoordsIter<T>,
 {
     let cos_theta = angle.to_radians().cos();
     let sin_theta = angle.to_radians().sin();
     let x0 = origin.x();
     let y0 = origin.y();
-    for point in points {
-        let x = point.x() - x0;
-        let y = point.y() - y0;
-        point.0.x = x * cos_theta - y * sin_theta + x0;
-        point.0.y = x * sin_theta + y * cos_theta + y0;
+    for coord in points.coords_iter_mut() {
+        let x = coord.x - x0;
+        let y = coord.y - y0;
+        coord.x = x * cos_theta - y * sin_theta + x0;
+        coord.y = x * sin_theta + y * cos_theta + y0;
     }
 }
 
@@ -71,7 +72,7 @@ pub trait RotatePoint<T> {
     /// let correct_ls = LineString(correct);
     /// assert_eq!(rotated, correct_ls);
     /// ```
-    fn rotate_around_point(&self, angle: T, point: &Point<T>) -> Self
+    fn rotate_around_point(&mut self, angle: T, point: &Point<T>)
     where
         T: Float;
 }
@@ -79,21 +80,10 @@ pub trait RotatePoint<T> {
 impl<T, G> RotatePoint<T> for G
 where
     T: Float,
-    G: MapCoords<T, T, Output = G>,
+    G: CoordsIter<T>,
 {
-    fn rotate_around_point(&self, angle: T, point: &Point<T>) -> Self {
-        let cos_theta = angle.to_radians().cos();
-        let sin_theta = angle.to_radians().sin();
-        let x0 = point.x();
-        let y0 = point.y();
-        self.map_coords(&|&(x, y)| {
-            let x = x - x0;
-            let y = y - y0;
-            (
-                x * cos_theta - y * sin_theta + x0,
-                x * sin_theta + y * cos_theta + y0,
-            )
-        })
+    fn rotate_around_point(&mut self, angle: T, point: &Point<T>) {
+        rotation_matrix(angle, point, self);
     }
 }
 
@@ -104,9 +94,9 @@ where
     /// Rotate the Point about itself by the given number of degrees
     /// This operation leaves the point coordinates unchanged
     fn rotate(&mut self, angle: T) {
-        let mut a = [*self];
-        rotation_matrix(angle, &self.centroid(), &mut a[..]);
-        *self = a[0];
+        // TODO do we need this
+        // TODO below is wrong
+        rotation_matrix(angle, &self.centroid(), self);
     }
 }
 
@@ -115,10 +105,7 @@ where
     T: Float,
 {
     fn rotate(&mut self, angle: T) {
-        let mut a = [self.start, self.end];
-        rotation_matrix(angle, &self.centroid(), &mut a);
-        self.start = a[0];
-        self.end = a[1];
+        rotation_matrix(angle, &self.centroid(), self);
     }
 }
 
@@ -128,7 +115,7 @@ where
 {
     /// Rotate the LineString about its centroid by the given number of degrees
     fn rotate(&mut self, angle: T) {
-        rotation_matrix(angle, &self.centroid().unwrap(), &mut self.0);
+        rotation_matrix(angle, &self.centroid().unwrap(), self);
     }
 }
 
@@ -143,9 +130,9 @@ where
             false => self.exterior.centroid().unwrap(),
             true => self.centroid().unwrap(),
         };
-        rotation_matrix(angle, &centroid, &mut self.exterior.0);
+        rotation_matrix(angle, &centroid, &mut self.exterior);
         for interior in &mut self.interiors {
-            rotation_matrix(angle, &centroid, &mut interior.0);
+            rotation_matrix(angle, &centroid, interior);
         }
     }
 }
@@ -156,6 +143,7 @@ where
 {
     /// Rotate the contained Polygons about their centroids by the given number of degrees
     fn rotate(&mut self, angle: T) {
+        // TODO: should these multis rotate around the centroid OF THE ENTIRE MULTI?
         for polygon in &mut self.0 {
             polygon.rotate(angle);
         }

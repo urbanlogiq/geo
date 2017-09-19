@@ -448,6 +448,22 @@ impl<T> Line<T>
     pub fn new(start: Point<T>, end: Point<T>) -> Line<T> {
         Line {start: start, end: end}
     }
+
+    pub fn points_iter<'a>(&'a self) -> Box<Iterator<Item = &'a Point<T>> + 'a> {
+        Box::new(
+            ::std::iter::once(&self.start)
+                .chain(::std::iter::once(&self.end))
+        )
+    }
+
+    pub fn points_iter_mut<'a>(&'a mut self) -> Box<Iterator<Item = &'a mut Point<T>> + 'a> {
+        Box::new(
+            ::std::iter::once(&mut self.start)
+                .chain(::std::iter::once(&mut self.end))
+        )
+    }
+
+    // pub fn iter_mut
 }
 
 /// A LineString, which is an ordered collection of [`Point`s](struct.Point.html).
