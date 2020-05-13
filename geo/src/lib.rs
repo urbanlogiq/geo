@@ -25,7 +25,7 @@
 //!
 //! ## Optional Features (these can be activated in your `cargo.toml`)
 //! The following optional features are available:
-//! - `from-postgis`: convert `Geometry` types to and from [`PostGIS`](https://docs.rs/postgis) types.
+//! - `postgis-integration`: convert `Geometry` types to and from [`PostGIS`](https://docs.rs/postgis) types.
 //! - `use-proj`: enable coordinate conversion and transformation of `Point` geometries using the [`proj`](https://docs.rs/proj) crate
 //! - `use-serde`: enable serialisation of geometries using `serde`.
 //!
